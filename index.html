@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>妳是我的好歸ME，體重報出來！</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --paper:#F2F4EF; --card:#FFFFFF; --ink:#1E2A25; --ink-soft:#5C6B64; --line:#D6DCD4;
+    --a:#2F6F5E; --b:#B8506F; --warn:#8A6A1F;
+    box-sizing:border-box;
+  }
+  *,*::before,*::after{box-sizing:inherit}
+  html,body{margin:0}
+  body{
+    background:var(--paper);color:var(--ink);
+    font-family:"Noto Sans TC",system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+    font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:26px 18px 64px}
+
+  header{margin-bottom:22px}
+  .bar{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;justify-content:space-between}
+  h1{font-family:"Noto Serif TC",serif;font-weight:700;font-size:clamp(25px,5.4vw,38px);line-height:1.22;margin:0;letter-spacing:.01em}
+  h1 .shout{display:block;font-size:.62em;color:var(--b);margin-top:2px}
+  .today{font-family:"Noto Serif TC",serif;font-size:16px;color:var(--ink-soft);border-left:3px solid var(--ink);padding-left:10px;margin-top:8px}
+
+  /* 同步狀態 */
+  .sync{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink-soft);margin-top:6px}
+  .dot{width:9px;height:9px;border-radius:50%;background:#B9C2BC;flex:none}
+  .dot.ok{background:var(--a)} .dot.busy{background:var(--warn)} .dot.bad{background:var(--b)}
+  .sync button{font:inherit;font-size:13.5px;cursor:pointer;background:none;border:none;color:var(--ink-soft);text-decoration:underline;padding:0}
+  .sync button:hover{color:var(--ink)}
+
+  .setup{background:#fff;border:1px solid var(--line);border-radius:10px;padding:0 16px;margin-top:14px}
+  .setup summary{cursor:pointer;padding:12px 0;font-size:15px;font-weight:500;list-style:none}
+  .setup summary::-webkit-details-marker{display:none}
+  .setup summary::before{content:"▸ ";color:var(--ink-soft)}
+  .setup[open] summary::before{content:"▾ "}
+  .setup .inner{padding:0 0 16px}
+  .setup p{margin:0 0 12px;font-size:14px;color:var(--ink-soft);max-width:68ch}
+  .setup code{background:#EEF1EC;padding:1px 5px;border-radius:4px;font-size:13px}
+
+  .logger{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px;box-shadow:0 1px 0 rgba(30,42,37,.04)}
+  .field{margin-bottom:16px}
+  label{display:block;font-size:14px;color:var(--ink-soft);margin-bottom:6px}
+  .who{display:flex;gap:10px;flex-wrap:wrap}
+  .who button{font:inherit;font-size:17px;font-weight:500;cursor:pointer;padding:10px 22px;border-radius:999px;border:1.5px solid var(--line);background:transparent;color:var(--ink-soft);transition:background .15s,color .15s,border-color .15s}
+  .who button[data-on="1"][data-p="心地"]{background:var(--a);border-color:var(--a);color:#fff}
+  .who button[data-on="1"][data-p="愛絲"]{background:var(--b);border-color:var(--b);color:#fff}
+  .row{display:flex;gap:14px;flex-wrap:wrap}
+  .row > .field{flex:1 1 180px}
+  input[type=date],input[type=number],input[type=text],input[type=url]{font:inherit;width:100%;padding:11px 12px;border-radius:8px;border:1.5px solid var(--line);background:#fff;color:var(--ink)}
+  input:focus-visible,button:focus-visible,summary:focus-visible{outline:2.5px solid var(--ink);outline-offset:2px}
+  .datenote{font-size:13.5px;margin-top:6px;color:var(--ink-soft)}
+  .datenote b{color:var(--ink);font-weight:500}
+  .datenote.late{color:var(--warn)}
+  .save{font:inherit;font-size:17px;font-weight:700;cursor:pointer;width:100%;padding:13px;border:none;border-radius:8px;background:var(--ink);color:#F2F4EF}
+  .save:hover{background:#2c3d36}
+  .save[disabled]{opacity:.55;cursor:progress}
+  .msg{min-height:22px;margin-top:10px;font-size:14px;color:var(--a)}
+  .msg.err{color:var(--b)}
+
+  .panels{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:26px}
+  @media(max-width:760px){.panels{grid-template-columns:1fr}}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .panel .top{padding:16px 18px 12px;border-top:4px solid var(--a)}
+  .pname{font-family:"Noto Serif TC",serif;font-size:21px;font-weight:700;margin:0}
+  .stats{display:flex;gap:26px;align-items:baseline;margin-top:8px;flex-wrap:wrap}
+  .stat b{font-family:"Noto Serif TC",serif;font-size:30px;font-weight:700;letter-spacing:-.01em}
+  .stat span{font-size:13px;color:var(--ink-soft);display:block;line-height:1.3}
+  .stat u{text-decoration:none;font-size:15px;color:var(--ink-soft);margin-left:3px}
+  .delta{font-size:14px;font-weight:500}
+  svg.chart{display:block;width:100%;height:auto}
+  .recent{border-top:1px solid var(--line);max-height:230px;overflow:auto}
+  .recent table{width:100%;border-collapse:collapse;font-size:14px}
+  .recent td{padding:8px 10px;border-bottom:1px solid #EDF0EC;vertical-align:top}
+  .recent td.d{color:var(--ink-soft);white-space:nowrap;width:1%}
+  .recent td.kg{font-weight:700;white-space:nowrap;width:1%}
+  .recent td.n{color:var(--ink-soft);word-break:break-word}
+  .recent td.x{width:1%}
+  .recent button{font:inherit;font-size:13px;cursor:pointer;border:none;background:none;color:var(--ink-soft);padding:2px 6px;border-radius:5px}
+  .recent button:hover{background:#F0F2EE;color:var(--b)}
+  .empty{padding:22px 18px;color:var(--ink-soft);font-size:14.5px}
+
+  .data{margin-top:26px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px}
+  .data h2{font-family:"Noto Serif TC",serif;font-size:18px;margin:0 0 4px}
+  .data p{margin:0 0 14px;font-size:14px;color:var(--ink-soft);max-width:68ch}
+  .tools{display:flex;gap:10px;flex-wrap:wrap}
+  .tools button{font:inherit;font-size:15px;cursor:pointer;padding:10px 16px;border-radius:8px;border:1.5px solid var(--ink);background:transparent;color:var(--ink)}
+  .tools button.primary{background:var(--ink);color:#F2F4EF}
+  .tools button:hover{background:#E6EAE3}
+  .tools button.primary:hover{background:#2c3d36;color:#fff}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="bar">
+      <div>
+        <h1>妳是我的好歸ME<span class="shout">體重報出來！</span></h1>
+        <div class="today" id="todayLabel"></div>
+      </div>
+      <div class="sync"><span class="dot" id="dot"></span><span id="syncText">尚未設定同步</span>
+        <button id="refresh" type="button">重新整理</button></div>
+    </div>
+
+    <details class="setup" id="setup">
+      <summary>同步設定</summary>
+      <div class="inner">
+        <p>貼上 Google Apps Script 部署後的網頁應用程式網址（結尾是 <code>/exec</code>）。兩個人各自在自己的手機貼一次同一組網址，之後誰登記，另一個人重新整理就看得到。</p>
+        <div class="row">
+          <div class="field" style="flex:2 1 320px">
+            <label for="api">Apps Script 網址</label>
+            <input type="url" id="api" placeholder="https://script.google.com/macros/s/……/exec">
+          </div>
+          <div class="field" style="flex:1 1 160px">
+            <label for="token">權杖（Apps Script 裡沒設就留空）</label>
+            <input type="text" id="token" placeholder="選填">
+          </div>
+        </div>
+        <button class="save" id="saveApi" style="width:auto;padding:11px 22px">儲存並測試連線</button>
+      </div>
+    </details>
+  </header>
+
+  <section class="logger">
+    <div class="field">
+      <label>今天誰要報？</label>
+      <div class="who" id="who">
+        <button type="button" data-p="心地" data-on="1">心地</button>
+        <button type="button" data-p="愛絲" data-on="0">愛絲</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="date">日期</label>
+        <input type="date" id="date">
+        <div class="datenote" id="dateNote"></div>
+      </div>
+      <div class="field">
+        <label for="kg">體重（公斤）</label>
+        <input type="number" id="kg" step="0.1" min="20" max="250" inputmode="decimal" placeholder="例如 52.4">
+      </div>
+    </div>
+    <div class="field">
+      <label for="note">備註（吃了什麼、運動、生理期…可留空）</label>
+      <input type="text" id="note" maxlength="60" placeholder="今天走了 8000 步">
+    </div>
+    <button class="save" id="save">記下來</button>
+    <div class="msg" id="msg"></div>
+  </section>
+
+  <div class="panels" id="panels"></div>
+
+  <section class="data">
+    <h2>拿去做後續分析</h2>
+    <p>所有紀錄都在你們的 Google 試算表裡，可以直接在試算表按 檔案 → 下載 → Microsoft Excel。也可以在這裡直接下載，會含日期、星期、登記者、體重、備註，並拆出兩人各一張工作表。</p>
+    <div class="tools">
+      <button class="primary" id="xlsx">下載 Excel</button>
+      <button id="csv">下載 CSV</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var CACHE="weight-log-cache", QUEUE="weight-log-queue", CFG="weight-log-cfg";
+  var PEOPLE=["心地","愛絲"], WD=["日","一","二","三","四","五","六"];
+  var COLORS={"心地":"#2F6F5E","愛絲":"#B8506F"};
+
+  /* ---------- 日期 ---------- */
+  function iso(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+  function parseISO(s){var p=String(s).split("-");return new Date(+p[0],+p[1]-1,+p[2]);}
+  function weekday(s){return "星期"+WD[parseISO(s).getDay()];}
+  function shiftDays(s,n){var d=parseISO(s);d.setDate(d.getDate()+n);return iso(d);}
+  function md(s){var p=s.split("-");return (+p[1])+"/"+(+p[2]);}
+  var TODAY=iso(new Date());
+
+  /* ---------- 狀態 ---------- */
+  var records=[], queue=[], cfg={url:"",token:""};
+  function ls(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+  function put(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+  function sortRec(){records.sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0;});}
+
+  function localUpsert(r){
+    var i=records.findIndex(function(x){return x.date===r.date&&x.person===r.person;});
+    var had=i>=0; if(had)records[i]=r; else records.push(r);
+    sortRec(); put(CACHE,records); return had;
+  }
+  function localRemove(date,person){
+    records=records.filter(function(r){return !(r.date===date&&r.person===person);});
+    put(CACHE,records);
+  }
+
+  /* ---------- 同步 ---------- */
+  var elDot=document.getElementById("dot"), elSync=document.getElementById("syncText");
+  function status(kind,text){ elDot.className="dot"+(kind?" "+kind:""); elSync.textContent=text; }
+
+  function api(payload){
+    if(!cfg.url) return Promise.reject(new Error("尚未設定同步網址"));
+    if(payload) payload.token=cfg.token||"";
+    var opt = payload
+      ? {method:"POST", body:JSON.stringify(payload), redirect:"follow"}   // 不設 header，避開 CORS 預檢
+      : {method:"GET", redirect:"follow"};
+    var url = cfg.url + (payload ? "" : (cfg.url.indexOf("?")<0?"?":"&")+"t="+Date.now());
+    return fetch(url,opt).then(function(res){return res.json();}).then(function(d){
+      if(!d || !d.ok) throw new Error((d&&d.error)||"伺服器回應異常");
+      if(d.records){ records=d.records; sortRec(); put(CACHE,records); }
+      return d;
+    });
+  }
+
+  function pull(quiet){
+    if(!cfg.url){ status("", "尚未設定同步"); return Promise.resolve(); }
+    if(!quiet) status("busy","更新中…");
+    return api(null).then(function(){
+      render(); fillExisting();
+      status("ok","已同步 "+new Date().toTimeString().slice(0,5));
+      return flush();
+    }).catch(function(e){
+      status("bad","連不上雲端（顯示的是上次的資料）");
+      if(!quiet) console.warn(e);
+    });
+  }
+
+  function flush(){
+    if(!cfg.url || !queue.length) return Promise.resolve();
+    var job=queue[0];
+    return api(job).then(function(){
+      queue.shift(); put(QUEUE,queue); render(); fillExisting();
+      if(queue.length) return flush();
+      status("ok","已同步 "+new Date().toTimeString().slice(0,5));
+    }).catch(function(){ status("bad","有 "+queue.length+" 筆還沒送上雲端"); });
+  }
+
+  function enqueue(job){
+    queue.push(job); put(QUEUE,queue);
+    status("busy","上傳中…");
+    return flush();
+  }
+
+  /* ---------- 設定 ---------- */
+  var elApi=document.getElementById("api"), elToken=document.getElementById("token");
+  document.getElementById("saveApi").addEventListener("click", function(){
+    var u=elApi.value.trim();
+    if(u && !/^https:\/\/script\.google\.com\/.*\/exec$/.test(u)){
+      if(!confirm("網址看起來不像 Apps Script 的 /exec 網址，還是要儲存嗎？")) return;
+    }
+    cfg={url:u, token:elToken.value.trim()}; put(CFG,cfg);
+    pull().then(function(){ if(cfg.url && elDot.className.indexOf("ok")>=0) document.getElementById("setup").open=false; });
+  });
+  document.getElementById("refresh").addEventListener("click", function(){ pull(); });
+
+  /* ---------- 表單 ---------- */
+  var elWho=document.getElementById("who"), elDate=document.getElementById("date"),
+      elKg=document.getElementById("kg"), elNote=document.getElementById("note"),
+      elMsg=document.getElementById("msg"), elDN=document.getElementById("dateNote"),
+      elSave=document.getElementById("save");
+  var person="心地";
+
+  document.getElementById("todayLabel").textContent=TODAY.replace(/-/g,"/")+"　"+weekday(TODAY);
+  elDate.value=TODAY; elDate.max=TODAY;
+
+  elWho.addEventListener("click",function(e){
+    var b=e.target.closest("button[data-p]"); if(!b)return;
+    person=b.dataset.p;
+    Array.prototype.forEach.call(elWho.children,function(x){x.dataset.on=(x.dataset.p===person)?"1":"0";});
+    fillExisting();
+  });
+  function updateDateNote(){
+    var v=elDate.value; if(!v){elDN.textContent="";return;}
+    var late=v!==TODAY;
+    elDN.className="datenote"+(late?" late":"");
+    elDN.innerHTML="<b>"+weekday(v)+"</b>"+(late?"　· 補登":"　· 今天");
+  }
+  function fillExisting(){
+    var hit=records.find(function(r){return r.date===elDate.value&&r.person===person;});
+    elKg.value=hit?hit.kg:""; elNote.value=hit?(hit.note||""):"";
+    elMsg.className="msg";
+    elMsg.textContent=hit?(person+" "+md(elDate.value)+" 已經報過 "+hit.kg.toFixed(1)+" kg，重新送出會覆蓋。"):"";
+  }
+  elDate.addEventListener("change",function(){updateDateNote();fillExisting();});
+  elKg.addEventListener("keydown",function(e){if(e.key==="Enter")doSave();});
+  elNote.addEventListener("keydown",function(e){if(e.key==="Enter")doSave();});
+  elSave.addEventListener("click",doSave);
+  function flash(t,bad){elMsg.textContent=t;elMsg.className="msg"+(bad?" err":"");}
+
+  function doSave(){
+    var d=elDate.value, kg=parseFloat(elKg.value);
+    if(!d) return flash("先選一個日期。",true);
+    if(d>TODAY) return flash("還沒到的日期沒辦法登記。",true);
+    if(!isFinite(kg)||kg<20||kg>250) return flash("體重請填 20 到 250 之間的數字。",true);
+    var rec={date:d,person:person,kg:Math.round(kg*10)/10,note:elNote.value.trim()};
+    var had=localUpsert(rec); render();
+    flash(person+"　"+md(d)+"（"+weekday(d)+"）"+kg.toFixed(1)+" kg "+(had?"已更新":"記好了")+(cfg.url?"":"　（尚未設定雲端，只存在這台裝置）"));
+    elNote.value="";
+    if(cfg.url){ elSave.disabled=true; enqueue({action:"save",record:rec}).then(function(){elSave.disabled=false;}); }
+  }
+
+  /* ---------- 折線圖 ---------- */
+  function chart(list){
+    var W=600,H=210,L=44,R=12,T=14,B=26,days=[],i;
+    for(i=29;i>=0;i--) days.push(shiftDays(TODAY,-i));
+    var map={}; list.forEach(function(r){map[r.date]=r.kg;});
+    var vals=days.map(function(d){return map[d];}).filter(function(v){return v!==undefined;});
+    if(!vals.length) return "";
+    var lo=Math.min.apply(null,vals), hi=Math.max.apply(null,vals);
+    if(hi-lo<1){var m=(hi+lo)/2;lo=m-0.6;hi=m+0.6;}
+    var pad=(hi-lo)*0.18; lo-=pad; hi+=pad;
+    var x=function(k){return L+k*(W-L-R)/29;};
+    var y=function(v){return T+(hi-v)/(hi-lo)*(H-T-B);};
+    var grid="";
+    [hi,(hi+lo)/2,lo].forEach(function(v){
+      grid+='<line x1="'+L+'" y1="'+y(v).toFixed(1)+'" x2="'+(W-R)+'" y2="'+y(v).toFixed(1)+'" stroke="#E5EAE4" stroke-width="1"/>'
+          + '<text x="'+(L-8)+'" y="'+(y(v)+4).toFixed(1)+'" text-anchor="end" font-size="11" fill="#8B9791">'+v.toFixed(1)+'</text>';
+    });
+    var segs=[],cur=[],dots="";
+    days.forEach(function(d,k){
+      var v=map[d];
+      if(v===undefined){ if(cur.length){segs.push(cur);cur=[];} return; }
+      cur.push([x(k),y(v)]);
+      dots+='<circle cx="'+x(k).toFixed(1)+'" cy="'+y(v).toFixed(1)+'" r="3" fill="currentColor"><title>'+d+' '+weekday(d)+' '+v.toFixed(1)+' kg</title></circle>';
+    });
+    if(cur.length) segs.push(cur);
+    var lines=segs.map(function(s){
+      if(s.length===1) return "";
+      return '<polyline fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" points="'
+        +s.map(function(p){return p[0].toFixed(1)+","+p[1].toFixed(1);}).join(" ")+'"/>';
+    }).join("");
+    var xl="";
+    [0,10,20,29].forEach(function(k){
+      xl+='<text x="'+x(k).toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" font-size="11" fill="#8B9791">'+md(days[k])+'</text>';
+    });
+    return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="近 30 日體重折線圖">'+grid+xl+lines+dots+'</svg>';
+  }
+
+  /* ---------- 面板 ---------- */
+  function avg7(list){
+    var from=shiftDays(TODAY,-6);
+    var v=list.filter(function(r){return r.date>=from&&r.date<=TODAY;}).map(function(r){return r.kg;});
+    if(!v.length) return null;
+    return {avg:v.reduce(function(a,b){return a+b;},0)/v.length, n:v.length};
+  }
+  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+
+  function render(){
+    document.getElementById("panels").innerHTML = PEOPLE.map(function(p){
+      var list=records.filter(function(r){return r.person===p;});
+      var latest=list[0], prev=list[1], a=avg7(list);
+      var delta=(latest&&prev)?latest.kg-prev.kg:null;
+      var deltaTxt=delta===null?"":'<span class="delta" style="color:'+(delta>0?"#B8506F":delta<0?"#2F6F5E":"#5C6B64")+'">'
+        +(delta>0?"▲":delta<0?"▼":"—")+" "+Math.abs(delta).toFixed(1)+'</span>';
+      var body = list.length
+        ? '<div style="color:'+COLORS[p]+'">'+(chart(list)||'<div class="empty">最近 30 天還沒有紀錄。</div>')+'</div>'
+          +'<div class="recent"><table><tbody>'
+          +list.slice(0,60).map(function(r){
+              return '<tr><td class="d">'+md(r.date)+' '+WD[parseISO(r.date).getDay()]+'</td>'
+                   +'<td class="kg">'+r.kg.toFixed(1)+'</td><td class="n">'+esc(r.note||"")+'</td>'
+                   +'<td class="x"><button data-del="'+r.date+'|'+p+'" title="刪除">✕</button></td></tr>';
+            }).join("")
+          +'</tbody></table></div>'
+        : '<div class="empty">還沒有紀錄。上面填一個數字就開始了。</div>';
+      return '<section class="panel" data-p="'+p+'"><div class="top" style="border-top-color:'+COLORS[p]+'">'
+        +'<h2 class="pname">'+p+'</h2><div class="stats">'
+        +'<div class="stat"><b>'+(latest?latest.kg.toFixed(1):"–")+'</b><u>kg</u> '+deltaTxt+'<span>'+(latest?md(latest.date)+" 最新":"尚未登記")+'</span></div>'
+        +'<div class="stat"><b>'+(a?a.avg.toFixed(1):"–")+'</b><u>kg</u><span>近 7 日平均'+(a?"（"+a.n+" 次）":"")+'</span></div>'
+        +'</div></div>'+body+'</section>';
+    }).join("");
+  }
+
+  document.getElementById("panels").addEventListener("click",function(e){
+    var b=e.target.closest("button[data-del]"); if(!b)return;
+    var k=b.dataset.del.split("|");
+    if(!confirm(k[1]+" "+k[0]+" 的紀錄要刪掉嗎？")) return;
+    localRemove(k[0],k[1]); render(); fillExisting();
+    if(cfg.url) enqueue({action:"delete",date:k[0],person:k[1]});
+  });
+
+  /* ---------- 匯出 ---------- */
+  function rows(){
+    return records.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:(a.person<b.person?-1:1);})
+      .map(function(r){return {"日期":r.date,"星期":weekday(r.date),"登記者":r.person,"體重(kg)":r.kg,"備註":r.note||""};});
+  }
+  var HEAD=["日期","星期","登記者","體重(kg)","備註"], COLS=[{wch:12},{wch:8},{wch:10},{wch:10},{wch:30}];
+  document.getElementById("xlsx").addEventListener("click",function(){
+    if(!records.length) return alert("目前沒有紀錄可以匯出。");
+    var wb=XLSX.utils.book_new();
+    var all=XLSX.utils.json_to_sheet(rows(),{header:HEAD}); all["!cols"]=COLS;
+    XLSX.utils.book_append_sheet(wb,all,"全部紀錄");
+    PEOPLE.forEach(function(p){
+      var r=rows().filter(function(x){return x["登記者"]===p;});
+      if(!r.length) return;
+      var ws=XLSX.utils.json_to_sheet(r,{header:HEAD}); ws["!cols"]=COLS;
+      XLSX.utils.book_append_sheet(wb,ws,p);
+    });
+    XLSX.writeFile(wb,"體重紀錄_"+TODAY.replace(/-/g,"")+".xlsx");
+  });
+  document.getElementById("csv").addEventListener("click",function(){
+    if(!records.length) return alert("目前沒有紀錄可以匯出。");
+    var ws=XLSX.utils.json_to_sheet(rows(),{header:HEAD});
+    var a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob(["\ufeff"+XLSX.utils.sheet_to_csv(ws)],{type:"text/csv;charset=utf-8"}));
+    a.download="體重紀錄_"+TODAY.replace(/-/g,"")+".csv";
+    a.click(); URL.revokeObjectURL(a.href);
+  });
+
+  /* ---------- 啟動 ---------- */
+  cfg=ls(CFG,{url:"",token:""}); records=ls(CACHE,[]); queue=ls(QUEUE,[]);
+  if(!Array.isArray(records)) records=[];
+  if(!Array.isArray(queue)) queue=[];
+  elApi.value=cfg.url||""; elToken.value=cfg.token||"";
+  sortRec(); updateDateNote(); fillExisting(); render();
+  if(cfg.url){ pull(); } else { document.getElementById("setup").open=true; status("","尚未設定同步"); }
+  setInterval(function(){ if(cfg.url && document.visibilityState==="visible") pull(true); }, 30000);
+  document.addEventListener("visibilitychange",function(){ if(document.visibilityState==="visible"&&cfg.url) pull(true); });
+})();
+</script>
+</body>
+</html>
