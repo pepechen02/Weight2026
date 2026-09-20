@@ -424,5 +424,6 @@
   document.addEventListener("visibilitychange",function(){ if(document.visibilityState==="visible"&&cfg.url) pull(true); });
 })();
 </script>
+<script> if ('serviceWorker' in navigator) { navigator.serviceWorker.register('./sw.js'); } </script>
 </body>
 </html>
